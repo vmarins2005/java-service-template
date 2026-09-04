@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Log em JSON desde o primeiro dia.
+
+  Trocar depois de o serviço estar em produção exige refazer todo dashboard, alerta e
+  consulta salva que já existirem em cima do formato antigo. É barato agora e caro depois.
+
+  O perfil "local" mantém o formato legível, porque JSON no terminal durante o
+  desenvolvimento não ajuda ninguém.
+-->
+<configuration>
+  <springProfile name="local">
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+  </springProfile>
+
+  <springProfile name="!local">
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+      <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+        <includeMdcKeyName>traceId</includeMdcKeyName>
+        <includeMdcKeyName>spanId</includeMdcKeyName>
+        <customFields>{"servico":"${spring.application.name:-template-servico}"}</customFields>
+      </encoder>
+    </appender>
+    <root level="INFO">
+      <appender-ref ref="JSON"/>
+    </root>
+  </springProfile>
+</configuration>
