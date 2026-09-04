@@ -18,7 +18,14 @@
     <maven.compiler.parameters>true</maven.compiler.parameters>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-    <spring-boot.version>3.4.1</spring-boot.version>
+    <spring-boot.version>4.1.1</spring-boot.version>
+    <!--
+      Sobrescreve a versao gerenciada pelo Spring Boot. O 4.1.1 traz o Tomcat 11.0.24, e o
+      11.0.25 corrige tres CVEs criticas de bypass de autenticacao. Um salto de patch dentro
+      da mesma linha e seguro; o motivo esta aqui para que a proxima pessoa saiba quando
+      pode remover esta linha. Ver ADR 0005.
+    -->
+    <tomcat.version>11.0.25</tomcat.version>
     <testcontainers.version>1.21.3</testcontainers.version>
     <archunit.version>1.3.0</archunit.version>
     <logstash-encoder.version>8.0</logstash-encoder.version>
@@ -36,17 +43,62 @@
 
   <dependencyManagement>
     <dependencies>
+      <!--
+        Correcao de tres CVEs criticas de bypass de autenticacao no Tomcat: o Spring Boot
+        4.1.1 gerencia o 11.0.24, e a correcao esta no 11.0.25.
+
+        Esta armadilha custou uma rodada de medicao: a primeira tentativa foi declarar
+        <tomcat.version>, que e o jeito documentado — e nao funcionou. Propriedade so
+        sobrescreve versao gerenciada quando o BOM entra como <parent>. Este projeto importa
+        o BOM em dependencyManagement, e ai a unica saida e gerenciar o artefato aqui.
+        Ver ADR 0005.
+
+        Entradas declaradas no proprio projeto tem precedencia sobre BOM importado, entao
+        estas tres ganham do que o Spring Boot define.
+      -->
       <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-dependencies</artifactId>
-        <version>${spring-boot.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
+        <groupId>org.apache.tomcat.embed</groupId>
+        <artifactId>tomcat-embed-core</artifactId>
+        <version>${tomcat.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.tomcat.embed</groupId>
+        <artifactId>tomcat-embed-el</artifactId>
+        <version>${tomcat.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.tomcat.embed</groupId>
+        <artifactId>tomcat-embed-websocket</artifactId>
+        <version>${tomcat.version}</version>
+      </dependency>
+
+      <!--
+        A ORDEM IMPORTA, e descobrir isso custou um classpath com duas majors.
+
+        Entre BOMs importados, o primeiro declarado ganha. Este import estava depois do
+        spring-boot-dependencies, e o resultado era postgresql:1.21.3 e junit-jupiter:1.21.3
+        (deste BOM, que declara esses artefatos) convivendo com testcontainers:2.0.5 (do BOM
+        do Spring Boot, que declara apenas o modulo central).
+
+        Duas majors da mesma biblioteca no mesmo classpath, e o dependencyConvergence nao
+        reclama, porque para ele sao artefatos diferentes. Ver ADR 0005.
+
+        Declarado aqui em cima, o 1.21.3 vale para a familia inteira. A alternativa seria
+        migrar para o Testcontainers 2.x, que consolidou os modulos e nao tem mais os
+        artefatos postgresql e junit-jupiter — e essa e uma migracao de verdade, nao um
+        ajuste de versao.
+      -->
       <dependency>
         <groupId>org.testcontainers</groupId>
         <artifactId>testcontainers-bom</artifactId>
         <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -73,9 +125,15 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
+    <!--
+      No Spring Boot 3 bastava o flyway-core: a auto-configuracao vinha dentro do
+      spring-boot-autoconfigure. O Boot 4 moveu cada integracao para o seu proprio modulo,
+      e sem este starter o Flyway simplesmente nao roda — a aplicacao sobe e o Hibernate
+      reclama de tabela faltando. Ver ADR 0005.
+    -->
     <dependency>
-      <groupId>org.flywaydb</groupId>
-      <artifactId>flyway-core</artifactId>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-flyway</artifactId>
     </dependency>
     <dependency>
       <groupId>org.flywaydb</groupId>
@@ -98,6 +156,16 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      No Spring Boot 3, @AutoConfigureMockMvc vinha dentro do starter-test. O Boot 4
+      quebrou as auto-configuracoes de teste em modulos por tecnologia, e o MockMvc passou
+      a exigir esta dependencia explicita. Ver ADR 0005.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-webmvc-test</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -152,9 +220,30 @@
                   <excludes>
                     <!-- Log4j 1.x nao recebe correcao desde 2015. -->
                     <exclude>log4j:log4j</exclude>
-                    <!-- O Spring traz o spring-jcl no lugar deste, e ter os dois no
-                         classpath e conflito de log esperando acontecer. -->
-                    <exclude>commons-logging:commons-logging</exclude>
+                    <!--
+                      junit:junit esteve banido aqui por uma tarde. JUnit 4 de carona junto
+                      com o 5 e a receita para um teste que nunca roda e ninguem percebe.
+
+                      A regra teve que sair: o Testcontainers 1.x depende de junit:junit em
+                      escopo de compilacao, entao bani-lo e banir o Testcontainers. A defesa
+                      que sobra e o provider do surefire ser o junit-platform, que ignora
+                      teste de JUnit 4 enquanto o vintage-engine nao estiver no classpath.
+
+                      A regra passou no Boot 4.1.1 por acidente, enquanto o testcontainers
+                      central resolvia para 2.0.5 — e reprovou assim que a familia inteira
+                      voltou para o 1.21.3. Ver ADR 0005.
+                    -->
+                    <!--
+                      commons-logging:commons-logging estava banido aqui, e o build
+                      quebrou na atualizacao para o Spring Boot 4: o Spring Framework 7
+                      aposentou o spring-jcl e o spring-core voltou a depender do
+                      commons-logging de verdade.
+
+                      A regra estava certa para o Spring 5 e 6, e envelheceu junto com o
+                      framework. Ficou registrada aqui, comentada, porque uma regra de
+                      enforcer sem data de validade vira ruido que alguem desliga em vez
+                      de entender. Ver ADR 0005.
+                    -->
                   </excludes>
                 </bannedDependencies>
               </rules>
