@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: tarifas
+      POSTGRES_USER: tarifas
+      POSTGRES_PASSWORD: tarifas
+    ports: ["5432:5432"]
+    healthcheck:
+      # Sem isto, o serviço sobe antes do banco aceitar conexão e morre no Flyway.
+      test: ["CMD-SHELL", "pg_isready -U tarifas -d tarifas"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  servico:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      JDBC_URL: jdbc:postgresql://postgres:5432/tarifas
+      JDBC_USER: tarifas
+      JDBC_PASSWORD: tarifas
+    ports: ["8080:8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
