@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Um push novo cancela a execução anterior do mesmo ramo: ninguém precisa do resultado
+# de um commit que já foi substituído.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build, testes e verificações
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # `verify` e não `test`: é aqui que roda o teste de integração com Postgres de
+      # verdade (Testcontainers usa o Docker que já existe no runner), o limite de
+      # cobertura e a geração do SBOM.
+      - name: mvn verify
+        run: ./mvnw -B verify
+
+      - name: Vulnerabilidades conhecidas no SBOM
+        # Mesmo comando que roda na máquina de quem desenvolve — nada de ação mágica
+        # que se comporta diferente aqui e lá.
+        run: |
+          docker run --rm -v "$PWD:/w" aquasec/trivy:latest \
+            sbom /w/target/sbom.json \
+            --scanners vuln --severity CRITICAL,HIGH --exit-code 1
+
+      - name: Imagem de contêiner
+        run: docker build -t template-servico:${{ github.sha }} .
+
+      # Sobem sempre, inclusive quando algo acima falhou: quando o build quebra é
+      # justamente quando alguém quer olhar o relatório.
+      - name: Relatórios
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios
+          path: |
+            target/site/jacoco/
+            target/sbom.json
+            target/surefire-reports/
+            target/failsafe-reports/
+          retention-days: 14
