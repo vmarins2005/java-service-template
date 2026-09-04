@@ -1,6 +1,12 @@
 # O esqueleto que decide o que entra
 
-[![CI](https://github.com/vmarins2005/java-template-servico/actions/workflows/ci.yaml/badge.svg)](https://github.com/vmarins2005/java-template-servico/actions/workflows/ci.yaml)
+O pipeline em [`.github/workflows/ci.yaml`](.github/workflows/ci.yaml) está **desarmado de
+propósito**: ele roda só por acionamento manual, porque este é um repositório de estudo e os
+minutos de execução são compartilhados com projetos reais.
+
+Ele foi executado de verdade uma vez, antes de ser desarmado — **2 min 35 s, verde**, com
+Testcontainers subindo Postgres no runner, os seis portões e a construção da imagem. Os
+gatilhos de um serviço real estão comentados no topo do arquivo.
 
 Template de serviço Java. O que ele demonstra não é regra de negócio — o domínio inteiro é um
 `record` de três campos, de propósito. O que ele demonstra é **o que o build recusa**.

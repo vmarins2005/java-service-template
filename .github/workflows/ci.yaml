@@ -1,12 +1,23 @@
 name: CI
 
+# ATENÇÃO: este pipeline está desarmado de propósito.
+#
+# Num serviço de verdade, os gatilhos são estes:
+#
+#   on:
+#     push:
+#       branches: [main]
+#     pull_request:
+#     workflow_dispatch:
+#
+# Aqui ele roda **só quando alguém clica**, porque este é um repositório de estudo e os
+# minutos de execução são compartilhados com projetos reais. O pipeline foi executado de
+# verdade uma vez, antes de ser desarmado — 2 min 35 s, verde, com Testcontainers subindo
+# Postgres no runner. O resultado está no histórico de execuções.
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
-# Um push novo cancela a execução anterior do mesmo ramo: ninguém precisa do resultado
+# Um push novo cancelaria a execução anterior do mesmo ramo: ninguém precisa do resultado
 # de um commit que já foi substituído.
 concurrency:
   group: ci-${{ github.ref }}
