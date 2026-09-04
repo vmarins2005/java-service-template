@@ -151,8 +151,15 @@ Formatador de código, biblioteca de mapeamento, autenticação, cache, mensager
 HTTP. O critério e o motivo de cada recusa estão no ADR 0001 — em resumo: **entra o que é caro
 de acrescentar depois; fica de fora o que cada time decide sozinho**.
 
-A imagem de contêiner deste template tem **565 MB**. Ela é um baseline correto e não
-otimizado — encolhê-la é o assunto do próximo projeto da série.
+A imagem de contêiner deste template tem **160 MB**
+(`docker image inspect --format '{{.Size}}'`). Ela é um baseline correto e não otimizado —
+encolhê-la é o assunto do projeto `java-imagem-enxuta` desta série.
+
+> Este número já esteve errado aqui: dizia 565 MB, lido da coluna `DISK USAGE` do
+> `docker images`, que soma camadas compartilhadas e cache de build de outro jeito. Duas
+> formas de medir a mesma coisa devolvendo números com três vezes de diferença é exatamente
+> o tipo de erro que um README com números convida — e a correção é dizer **qual comando**
+> produziu o número, não só o número.
 
 ## Exercícios
 
