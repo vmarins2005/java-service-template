@@ -46,7 +46,7 @@ A única exclusão é a classe de bootstrap, e ela está à vista no plugin.
 
 **O que o limite não faz**: cobertura mede o que foi *executado*, não o que foi *verificado*.
 Um teste sem asserção alguma cobre tudo. É por isso que a série tem um projeto separado de
-mutation testing — `java-rateio-fatura` — e por que o número aqui é um piso, não uma meta.
+mutation testing — `java-mutation-testing` — e por que o número aqui é um piso, não uma meta.
 
 ## Consequências
 

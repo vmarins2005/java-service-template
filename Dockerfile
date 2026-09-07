@@ -1,5 +1,5 @@
 # Baseline correto, não otimizado — encolher esta imagem é o assunto do projeto
-# `java-imagem-enxuta` desta série, que parte exatamente daqui.
+# `java-docker-image-optimization` desta série, que parte exatamente daqui.
 
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /fonte
